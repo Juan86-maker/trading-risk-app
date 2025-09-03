@@ -28,9 +28,17 @@ cfg_data = worksheet_cfg.get_all_records()
 df_cfg = pd.DataFrame(cfg_data)
 
 LOT_SIZES = dict(zip(df_cfg["Symbol"], df_cfg["LotSize"]))
-MARGIN_PCTS = dict(
-    zip(df_cfg["Symbol"], [float(str(x).replace("%", "")) / 100 for x in df_cfg["MarginPct"]])
-)
+def limpiar_margin(valor):
+    if valor is None or str(valor).strip() == "":
+        return 0.0
+    v = str(valor).replace("%", "").replace(",", ".").strip()
+    try:
+        return float(v) / 100
+    except:
+        return 0.0
+
+MARGIN_PCTS = dict(zip(df_cfg["Symbol"], [limpiar_margin(x) for x in df_cfg["MarginPct"]]))
+
 
 # --- Funciones de cálculo ---
 def calcular_metricas(simbolo, lote, precio, sl, tp):
