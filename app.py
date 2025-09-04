@@ -203,7 +203,7 @@ if st.session_state.show_reg:
                     "Margen": round(margen or 0.0, 2),
                     "Riesgo": round(riesgo or 0.0, 2) if riesgo is not None else "",
                     "Beneficio": round(beneficio or 0.0, 2) if beneficio is not None else "",
-                    "R/B": f"{(beneficio/riesgo):.2f}:1" if (riesgo and riesgo > 0) else "",
+                    "R/B": (f"{(beneficio / riesgo):.2f}:1"if (riesgo is not None and beneficio is not None and riesgo > 0)else ""),
                     "Orden": orden_tipo,
                     "Orden Tipo": orden_tipo,
                     "Estado": orden_tipo,
