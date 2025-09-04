@@ -143,3 +143,32 @@ if st.button("Registrar Suceso"):
     fila = [datos.get(h, "") for h in headers] if headers else list(datos.values())
     ws_ops.append_row(fila)
     st.success("✅ Operación registrada en Google Sheets.")
+    
+    # ===== Mostrar lista de sucesos =====
+st.markdown("## 📋 Lista de Sucesos")
+
+try:
+    registros = ws_ops.get_all_records()
+    df_ops = pd.DataFrame(registros)
+
+    if not df_ops.empty:
+        # Colorear según tipo de orden (Mercado vs Pendiente)
+        def highlight_row(row):
+            if "Orden" in df_ops.columns:
+                if row["Orden"] == "Pendiente":
+                    return ["background-color: #fff3cd"] * len(row)  # amarillo suave
+                else:
+                    return ["background-color: #d4edda"] * len(row)  # verde suave
+            return [""] * len(row)
+
+        st.dataframe(
+            df_ops.style.apply(highlight_row, axis=1),
+            use_container_width=True,
+            height=400,
+        )
+    else:
+        st.info("Aún no hay operaciones registradas.")
+
+except Exception as e:
+    st.error(f"No se pudo leer la hoja de sucesos: {e}")
+
