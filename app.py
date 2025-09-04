@@ -230,7 +230,17 @@ if st.session_state.show_reg:
 
                 # append a la hoja
                 ws_ops.append_row(fila)
-                st.success("✅ Operación registrada en Google Sheets.")
+                st.success("✅ Suceso registrado correctamente.")
+
+                # Resetear valores del formulario
+                st.session_state["lote"] = 0.0
+                st.session_state["precio"] = 0.0
+                st.session_state["sl"] = 0.0
+                st.session_state["tp"] = 0.0
+                
+                # Cerrar panel de preguntas
+                st.session_state["show_extra_fields"] = False
+
                 st.session_state.show_reg = False
 
     with col_cancel:
