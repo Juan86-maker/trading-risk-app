@@ -6,7 +6,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="Trading Risk App", layout="wide")
 
-# ========= Conexión Google Sheets =========
+# ===== Conexión Google Sheets =====
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
@@ -26,11 +26,10 @@ ws_ops = sheet.worksheet(WS_OPERACIONES)
 ws_hist = sheet.worksheet(WS_HISTORIAL)
 ws_cfg = sheet.worksheet(WS_CONFIG)
 
-# ========= Config desde hoja Config =========
+# ===== Config desde hoja Config =====
 cfg_records = ws_cfg.get_all_records()
 df_cfg = pd.DataFrame(cfg_records)
 
-# Validaciones mínimas
 required_cols = {"Symbol", "LotSize", "MarginPct"}
 if not required_cols.issubset(set(df_cfg.columns)):
     st.error(
@@ -48,58 +47,12 @@ def limpiar_margin(v):
     except Exception:
         return 0.0
 
-# Diccionarios dinámicos
 LOT_SIZES = dict(zip(df_cfg["Symbol"], df_cfg["LotSize"]))
 MARGIN_PCTS = dict(zip(df_cfg["Symbol"], [limpiar_margin(x) for x in df_cfg["MarginPct"]]))
 
-# ========= Funciones de cálculo =========
-def calc_margen(simbolo, lote, precio):
-    try:
-        lot_size = float(LOT_SIZES.get(simbolo, 1) or 1)
-        margin_pct = float(MARGIN_PCTS.get(simbolo, 0.0) or 0.0)
-        if lote is None or precio is None:
-            return None
-        return margin_pct * float(lote) * float(precio) * lot_size
-    except Exception:
-        return None
-
-def calc_riesgo(simbolo, lote, precio, sl):
-    try:
-        lot_size = float(LOT_SIZES.get(simbolo, 1) or 1)
-        if lote is None or precio is None or sl is None:
-            return None
-        return float(lote) * abs(float(precio) - float(sl)) * lot_size
-    except Exception:
-        return None
-
-def calc_beneficio(simbolo, lote, precio, tp):
-    try:
-        lot_size = float(LOT_SIZES.get(simbolo, 1) or 1)
-        if lote is None or precio is None or tp is None:
-            return None
-        return float(lote) * abs(float(tp) - float(precio)) * lot_size
-    except Exception:
-        return None
-
-def format_money(v):
-    if v is None:
-        return "-"
-    try:
-        # formato con separador de miles y 2 decimales
-        return f"{v:,.2f}"
-    except Exception:
-        return str(v)
-
-def format_rb(riesgo, beneficio):
-    try:
-        if riesgo and riesgo > 0 and beneficio is not None:
-            return f"{beneficio/riesgo:.2f} : 1"
-        return "0.00 : 1"
-    except Exception:
-        return "0.00 : 1"
-
+# ===== Helpers: parseo y formateo =====
 def parse_decimal_input(s):
-    """Parsea texto que puede usar coma o punto en decimal. Devuelve float o None si vacío."""
+    """Acepta texto con coma o punto, devuelve float o None."""
     if s is None:
         return None
     s = str(s).strip()
@@ -111,20 +64,54 @@ def parse_decimal_input(s):
     except Exception:
         return None
 
-def sl_tp_consistente(tipo, precio, sl, tp):
-    """Comprueba consistencia: Compra -> SL < Precio < TP ; Venta -> TP < Precio < SL"""
-    if precio is None or sl is None or tp is None:
-        return False
+def format_money(v):
+    if v is None:
+        return "-"
     try:
-        p = float(precio); s = float(sl); t = float(tp)
+        return f"{v:,.2f}"
     except Exception:
-        return False
-    if tipo == "Compra":
-        return (s < p) and (t > p)
-    else:
-        return (s > p) and (t < p)
+        return str(v)
 
-# ========= UI: Entradas =========
+def format_rb(riesgo, beneficio):
+    if riesgo is None or beneficio is None:
+        return "-"
+    try:
+        if riesgo > 0:
+            return f"{beneficio / riesgo:.2f} : 1"
+        return "Incoherente"
+    except Exception:
+        return "-"
+
+# ===== Cálculos basados en tipo (Compra/Venta) =====
+def calcular_metricas(simbolo, lote, precio, sl, tp):
+    """
+    Devuelve (margen, riesgo, beneficio, rb, coherente_flag)
+    donde riesgo y beneficio pueden ser negativos si los datos son incoherentes.
+    """
+    try:
+        lot_size = float(LOT_SIZES.get(simbolo, 1) or 1)
+        margin_pct = float(MARGIN_PCTS.get(simbolo, 0.0) or 0.0)
+
+        # Margen igual en ambos casos
+        margen = margin_pct * float(lote) * float(precio) * lot_size
+
+        # según tipo, riesgo y beneficio usando diferencias (no absolutos) y dividiendo por tamaño de lote
+        if tipo == "Compra":
+            riesgo = float(lote) * (float(precio) - float(sl)) / lot_size
+            beneficio = float(lote) * (float(tp) - float(precio)) / lot_size
+        else:  # Venta
+            riesgo = float(lote) * (float(sl) - float(precio)) / lot_size
+            beneficio = float(lote) * (float(precio) - float(tp)) / lot_size
+
+        # coherente: ambos > 0
+        coherente = (riesgo is not None and beneficio is not None and riesgo > 0 and beneficio > 0)
+        rb = (beneficio / riesgo) if (riesgo and riesgo > 0) else None
+
+        return margen, riesgo, beneficio, rb, coherente
+    except Exception:
+        return None, None, None, None, False
+
+# ===== UI =====
 st.title("📈 Calculadora de Riesgo & Gestor de Operaciones")
 
 colA, colB = st.columns([1, 1])
@@ -136,26 +123,42 @@ with colA:
     if lote is None:
         st.info("Introduce un lote válido (ej. 0,02 o 0.02).")
 with colB:
-    precio = st.number_input("Precio", min_value=0.0, value=float(st.session_state.get("precio", 0.0)), step=0.01, key="precio")
-    sl = st.number_input("Stop Loss", min_value=0.0, value=float(st.session_state.get("sl", 0.0)), step=0.01, key="sl")
-    tp = st.number_input("Take Profit", min_value=0.0, value=float(st.session_state.get("tp", 0.0)), step=0.01, key="tp")
+    precio_str = st.text_input("Precio (usa coma o punto)", value=st.session_state.get("precio_str", ""), key="precio_str")
+    sl_str = st.text_input("Stop Loss (usa coma o punto)", value=st.session_state.get("sl_str", ""), key="sl_str")
+    tp_str = st.text_input("Take Profit (usa coma o punto)", value=st.session_state.get("tp_str", ""), key="tp_str")
 
-# Cálculo en vivo (si los valores son interpretables)
-margen = calc_margen(simbolo, lote, precio)
-riesgo = calc_riesgo(simbolo, lote, precio, sl)
-beneficio = calc_beneficio(simbolo, lote, precio, tp)
-rb_text = format_rb(riesgo, beneficio)
+    precio = parse_decimal_input(precio_str)
+    sl = parse_decimal_input(sl_str)
+    tp = parse_decimal_input(tp_str)
+
+    if precio is None:
+        st.info("Introduce un Precio válido.")
+    if sl is None:
+        st.info("Introduce Stop Loss válido.")
+    if tp is None:
+        st.info("Introduce Take Profit válido.")
+
+# ===== Cálculos en vivo =====
+margen, riesgo, beneficio, rb, coherente = (None, None, None, None, False)
+if lote is not None and precio is not None and sl is not None and tp is not None:
+    margen, riesgo, beneficio, rb, coherente = calcular_metricas(simbolo, lote, precio, sl, tp)
 
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Margen [$]", format_money(margen))
-m2.metric("Riesgo de pérdida [$]", format_money(riesgo))
-m3.metric("Posible beneficio [$]", format_money(beneficio))
-m4.metric("Relación riesgo/beneficio", rb_text)
+m1.metric("Margen [$]", format_money(round(margen, 2) if margen is not None else None))
+m2.metric("Riesgo de pérdida [$]", format_money(round(riesgo, 2) if riesgo is not None else None))
+m3.metric("Posible beneficio [$]", format_money(round(beneficio, 2) if beneficio is not None else None))
+m4.metric("Relación riesgo/beneficio", format_rb(riesgo if riesgo is not None else None, beneficio if beneficio is not None else None))
 
-# Validación SL/TP según tipo
-consistente = sl_tp_consistente(tipo, precio, sl, tp)
+# Si hay valores negativos o cero, mostrar advertencia
+if (riesgo is not None and riesgo <= 0) or (beneficio is not None and beneficio <= 0):
+    st.warning(
+        "⚠️ Valores incoherentes detectados según el tipo de operación.\n\n"
+        "Para **Compra** debe cumplirse: SL < Precio < TP (riesgo = Precio - SL ; beneficio = TP - Precio).\n"
+        "Para **Venta** debe cumplirse: TP < Precio < SL (riesgo = SL - Precio ; beneficio = Precio - TP).\n\n"
+        "Si quieres, pulsa **Invertir SL y TP** para cambiar sus valores."
+    )
 
-# ========= Registro del suceso =========
+# ===== Registro del suceso (con opción invertir / forzar) =====
 st.markdown("---")
 if "show_reg" not in st.session_state:
     st.session_state.show_reg = False
@@ -171,33 +174,23 @@ if st.session_state.show_reg:
     with colr2:
         comentario = st.text_area("Comentario de justificación (opcional)", key="comentario")
 
-    # Si no hay lote válido, mostrar error
-    if lote is None:
-        st.error("El campo 'Lote' no es válido. Corrígelo antes de guardar.")
-    else:
-        # Si SL/TP no son coherentes con el tipo, mostrar advertencia y ofrecer invertir
-        if not consistente:
-            st.warning(
-                f"Los valores SL/TP no son consistentes con una operación de tipo **{tipo}**.\n\n"
-                "Para **Compra**: SL < Precio < TP. \n"
-                "Para **Venta**: TP < Precio < SL."
-            )
-            if st.button("Invertir SL y TP (hacer consistentes)"):
-                # Intercambiar valores en session_state para que los widgets se actualicen al rerun
-                current_sl = st.session_state.get("sl", 0.0)
-                current_tp = st.session_state.get("tp", 0.0)
-                st.session_state["sl"] = current_tp
-                st.session_state["tp"] = current_sl
-                st.experimental_rerun()
+    # Botón invertir SL/TP
+    if st.button("Invertir SL y TP (intercambiar valores)"):
+        # intercambiar las cadenas para mantener el formato del usuario
+        prev_sl = st.session_state.get("sl_str", sl_str)
+        prev_tp = st.session_state.get("tp_str", tp_str)
+        st.session_state["sl_str"] = prev_tp
+        st.session_state["tp_str"] = prev_sl
+        st.experimental_rerun()
 
-            st.info("Corrige SL/TP o pulsa 'Invertir SL y TP' para adaptar los valores al tipo seleccionado.")
-        else:
-            # Mostrar botón aceptar solo si es consistente
+    # Si lote o precios no parsean, impedir guardado
+    if lote is None or precio is None or sl is None or tp is None:
+        st.error("Corrige los campos Lote/Precio/SL/TP (deben ser números con coma o punto).")
+    else:
+        if coherente:
             if st.button("Aceptar y Guardar"):
-                # Obtener la primera fila (cabeceras) para respetar orden
                 headers = ws_ops.row_values(1)
                 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
                 datos = {
                     "Fecha": now,
                     "Símbolo": simbolo,
@@ -214,24 +207,61 @@ if st.session_state.show_reg:
                     "Riesgo": round(riesgo or 0.0, 2),
                     "Riesgo de pérdida": round(riesgo or 0.0, 2),
                     "Beneficio": round(beneficio or 0.0, 2),
-                    "R/B": rb_text,
-                    "Relación": rb_text,
+                    "R/B": f"{(beneficio/riesgo):.2f}:1" if (riesgo and riesgo > 0) else "Incoherente",
+                    "Relación": f"{(beneficio/riesgo):.2f}:1" if (riesgo and riesgo > 0) else "Incoherente",
                     "Orden": orden_tipo,
                     "Orden Tipo": orden_tipo,
                     "Comentario": comentario or "",
                 }
-
                 fila = [datos.get(h, "") for h in headers] if headers else [
                     now, simbolo, tipo, lote, precio, sl, tp,
                     round(margen or 0.0, 2), round(riesgo or 0.0, 2), round(beneficio or 0.0, 2),
-                    rb_text, orden_tipo, comentario or ""
+                    f"{(beneficio/riesgo):.2f}:1" if (riesgo and riesgo > 0) else "Incoherente",
+                    orden_tipo, comentario or ""
                 ]
-
                 ws_ops.append_row(fila)
                 st.success("✅ Operación registrada en Google Sheets.")
                 st.session_state.show_reg = False
+        else:
+            st.warning("Los cálculos indican inconsistencia (riesgo o beneficio no positivos).")
+            force = st.checkbox("Forzar guardado aun siendo inconsistente (no recomendado)")
+            if force and st.button("Guardar forzado"):
+                headers = ws_ops.row_values(1)
+                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                datos = {
+                    "Fecha": now,
+                    "Símbolo": simbolo,
+                    "Simbolo": simbolo,
+                    "Tipo": tipo,
+                    "Lote": lote,
+                    "Precio": precio,
+                    "Stop Loss": sl,
+                    "StopLose": sl,
+                    "SL": sl,
+                    "Take Profit": tp,
+                    "TP": tp,
+                    "Margen": round(margen or 0.0, 2),
+                    "Riesgo": round(riesgo or 0.0, 2) if riesgo is not None else "",
+                    "Riesgo de pérdida": round(riesgo or 0.0, 2) if riesgo is not None else "",
+                    "Beneficio": round(beneficio or 0.0, 2) if beneficio is not None else "",
+                    "R/B": f"{(beneficio/riesgo):.2f}:1" if (riesgo and riesgo > 0) else "Incoherente",
+                    "Relación": f"{(beneficio/riesgo):.2f}:1" if (riesgo and riesgo > 0) else "Incoherente",
+                    "Orden": orden_tipo,
+                    "Orden Tipo": orden_tipo,
+                    "Comentario": comentario or "",
+                }
+                fila = [datos.get(h, "") for h in headers] if headers else [
+                    now, simbolo, tipo, lote, precio, sl, tp,
+                    round(margen or 0.0, 2), round(riesgo or 0.0, 2) if riesgo is not None else "",
+                    round(beneficio or 0.0, 2) if beneficio is not None else "",
+                    f"{(beneficio/riesgo):.2f}:1" if (riesgo and riesgo > 0) else "Incoherente",
+                    orden_tipo, comentario or ""
+                ]
+                ws_ops.append_row(fila)
+                st.success("✅ Operación (forzada) registrada en Google Sheets.")
+                st.session_state.show_reg = False
 
-# ========= Lista de operaciones =========
+# ===== Lista de operaciones =====
 st.markdown("---")
 st.subheader("📋 Lista de operaciones")
 try:
@@ -240,9 +270,7 @@ try:
     if df_ops.empty:
         st.info("No hay operaciones registradas.")
     else:
-        # Detección flexible de columna de estado de orden
         order_col = "Orden" if "Orden" in df_ops.columns else ("Orden Tipo" if "Orden Tipo" in df_ops.columns else None)
-
         if order_col:
             def color_row(row):
                 color = "lightblue" if str(row[order_col]).strip().lower() == "pendiente" else "lightgreen"
