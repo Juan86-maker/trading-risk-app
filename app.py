@@ -66,3 +66,80 @@ def format_rb(riesgo, beneficio):
         return "-"
     if riesgo > 0:
         return f"{beneficio / riesgo:.2f} : 1"
+    return "Incoherente"
+
+# ===== UI =====
+st.title("📈 Calculadora de Riesgo & Gestor de Operaciones")
+
+colA, colB = st.columns([1, 1])
+with colA:
+    simbolo = st.selectbox("Símbolo", options=df_cfg["Symbol"].tolist())
+    tipo = st.selectbox("Tipo", ["Compra", "Venta"])
+    lote = parse_decimal_input(st.text_input("Lote", "0,10"))
+
+with colB:
+    precio = parse_decimal_input(st.text_input("Precio", ""))
+    sl = parse_decimal_input(st.text_input("Stop Loss", ""))
+    tp = parse_decimal_input(st.text_input("Take Profit", ""))
+
+# ===== Cálculos dinámicos =====
+margen = riesgo = beneficio = rb = None
+coherente = True
+
+if lote is not None and precio is not None:
+    lot_size = float(LOT_SIZES.get(simbolo, 1) or 1)
+    margin_pct = float(MARGIN_PCTS.get(simbolo, 0.0) or 0.0)
+    margen = margin_pct * lote * precio * lot_size
+
+if lote is not None and precio is not None and sl is not None:
+    lot_size = float(LOT_SIZES.get(simbolo, 1) or 1)
+    if tipo == "Compra":
+        riesgo = lote * (precio - sl) / lot_size
+    else:
+        riesgo = lote * (sl - precio) / lot_size
+    if riesgo <= 0:
+        coherente = False
+
+if lote is not None and precio is not None and tp is not None:
+    lot_size = float(LOT_SIZES.get(simbolo, 1) or 1)
+    if tipo == "Compra":
+        beneficio = lote * (tp - precio) / lot_size
+    else:
+        beneficio = lote * (precio - tp) / lot_size
+    if beneficio <= 0:
+        coherente = False
+
+if riesgo and beneficio and riesgo > 0:
+    rb = beneficio / riesgo
+
+# ===== Mostrar métricas =====
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Margen [$]", format_money(margen))
+m2.metric("Riesgo de pérdida [$]", format_money(riesgo))
+m3.metric("Posible beneficio [$]", format_money(beneficio))
+m4.metric("Relación riesgo/beneficio", format_rb(riesgo, beneficio))
+
+if not coherente and (riesgo is not None or beneficio is not None):
+    st.warning("⚠️ Los valores parecen incoherentes para el tipo de operación.")
+
+# ===== Registro del suceso =====
+st.markdown("---")
+if st.button("Registrar Suceso"):
+    headers = ws_ops.row_values(1)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    datos = {
+        "Fecha": now,
+        "Símbolo": simbolo,
+        "Tipo": tipo,
+        "Lote": lote or "",
+        "Precio": precio or "",
+        "Stop Loss": sl or "",
+        "Take Profit": tp or "",
+        "Margen": round(margen, 2) if margen is not None else "",
+        "Riesgo": round(riesgo, 2) if riesgo is not None else "",
+        "Beneficio": round(beneficio, 2) if beneficio is not None else "",
+        "R/B": f"{rb:.2f}:1" if rb is not None else "",
+    }
+    fila = [datos.get(h, "") for h in headers] if headers else list(datos.values())
+    ws_ops.append_row(fila)
+    st.success("✅ Operación registrada en Google Sheets.")
