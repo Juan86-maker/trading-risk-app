@@ -13,7 +13,7 @@ creds = Credentials.from_service_account_info(
 )
 client = gspread.authorize(creds)
 
-SHEET_ID = st.secrets["default"]["sheet_id"]
+SHEET_ID = st.secrets["private_gsheets"]["sheet_id"]
 sh = client.open_by_key(SHEET_ID)
 
 ws_ops = sh.worksheet("Operaciones")
