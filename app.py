@@ -184,7 +184,7 @@ if lote is not None and precio is not None and sl is not None:
     else:
         riesgo = lote * (precio - sl) / lot_size
     # positive expected for coherent data
-    if riesgo <= 0:
+    if riesgo > 0:
         incoherente = True
 
 if lote is not None and precio is not None and tp is not None:
@@ -192,7 +192,7 @@ if lote is not None and precio is not None and tp is not None:
         beneficio = lote * (tp - precio) / lot_size
     else:
         beneficio = lote * (precio - tp) / lot_size
-    if beneficio <= 0:
+    if beneficio < 0:
         incoherente = True
 
 if (riesgo is not None) and (beneficio is not None) and riesgo > 0:
