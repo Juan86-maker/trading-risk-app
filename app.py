@@ -281,7 +281,7 @@ if st.session_state["show_register_panel"]:
                     # close panel and request clearing of fields on next run
                     st.session_state["show_register_panel"] = False
                     st.session_state["_clear_after_save"] = True
-                    st.experimental_rerun()
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Error al guardar en Google Sheets: {e}")
 
@@ -364,7 +364,7 @@ else:
                         ws_hist.append_row(hist_row)
                         ws_ops.delete_row(sel_rownum)
                         st.success("Operación pendiente eliminada y registrada en Historial.")
-                        st.experimental_rerun()
+                        st.rerun()
             except Exception as e:
                 st.error(f"Error al intentar eliminar: {e}")
 
@@ -420,7 +420,7 @@ else:
                         ws_hist.append_row(hist_row)
                         ws_ops.delete_row(sel_rownum)
                         st.success("Cierre automático registrado en Historial y eliminado de Operaciones.")
-                        st.experimental_rerun()
+                        st.rerun()
 
             except Exception as e:
                 st.error(f"Error cierre automático: {e}")
@@ -465,7 +465,7 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
             # clear edit state and refresh
             del st.session_state["_edit_rownum"]
             del st.session_state["_edit_row"]
-            st.experimental_rerun()
+            st.rerun()
         except Exception as e:
             st.error(f"Error al guardar modificación: {e}")
 
@@ -523,7 +523,7 @@ with col1:
                         ws_hist.append_row(hist_row)
                         ws_ops.delete_row(sel_rownum)
                         st.success("Cierre manual registrado y operación eliminada de Operaciones.")
-                        st.experimental_rerun()
+                        st.rerun()
         except Exception as e:
             st.error(f"Error cierre manual: {e}")
 
