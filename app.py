@@ -107,8 +107,8 @@ if rb is not None:
 
 # ---- Panel de detalles adicionales ----
 with st.expander("Detalles de la orden", expanded=st.session_state["show_extra_fields"]):
-    st.session_state["orden_tipo"] = st.radio("Tipo de orden", ["Mercado", "Pendiente"], key="orden_tipo")
-    st.session_state["justificacion"] = st.text_area("Justificación", key="justificacion")
+    orden_tipo = st.radio("Tipo de orden", ["Mercado", "Pendiente"], key="orden_tipo")
+    justificacion = st.text_area("Justificación", key="justificacion")
 
 # ---- Botón para guardar ----
 if st.button("✅ Registrar Suceso"):
