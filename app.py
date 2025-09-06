@@ -356,11 +356,20 @@ else:
             try:
                 headers = ws_ops.row_values(1)
                 row_values = ws_ops.row_values(sel_rownum)
-                row_dict = {h: (row_values[idx] if idx < len(row_values) else "") for idx,h in enumerate(headers)}
+                #row_dict = {h: (row_values[idx] if idx < len(row_values) else "") for idx,h in enumerate(headers)}
                 
-                st.write("DEBUG Estado detectado:", row_dict)  # 👈 muestra en pantalla lo que realmente se lee
+                #st.write("DEBUG Estado detectado:", row_dict)  # 👈 muestra en pantalla lo que realmente se lee
 
-                estado = str(row_dict.get("Estado") or row_dict.get("Orden") or row_dict.get("Orden Tipo") or "").strip().lower()
+                #estado = str(row_dict.get("Estado") or row_dict.get("Orden") or row_dict.get("Orden Tipo") or "").strip().lower()
+                
+                row_dict = {h: (row_values[idx] if idx < len(row_values) else "") for idx,h in enumerate(headers)}
+
+                estado = str(
+                    row_dict.get("Orden Tipo") or 
+                    row_dict.get("Estado") or 
+                    row_dict.get("Orden") or ""
+                ).strip().lower()
+
                 if estado != "pendiente":
                     st.error("Solo se pueden eliminar operaciones que estén en estado 'Pendiente'.")
                 else:
