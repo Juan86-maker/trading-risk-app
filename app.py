@@ -316,7 +316,7 @@ else:
     # get number of header columns to compute row numbers: records correspond to rows 2..n+1
     options = []
     for i, row in df_ops.iterrows():
-        rownum = i + 1
+        rownum = i
         estado = str(row.get("Estado") or row.get("Orden") or row.get("Orden Tipo") or "").strip()
         display = f"{rownum} | {row.get('Símbolo','')} | {row.get('Tipo','')} | {estado}"
         options.append(display)
