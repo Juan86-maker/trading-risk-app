@@ -373,7 +373,7 @@ else:
                             "Eliminada", justification
                         ]
                         ws_hist.append_row(hist_row)
-                        ws_ops.delete_rows(sel_rownum)
+                        ws_ops.delete_rows(sel_rownum + 2)
                         st.success("Operación pendiente eliminada y registrada en Historial.")
                         st.rerun()
             except Exception as e:
