@@ -372,8 +372,8 @@ else:
                             "", row_dict.get("Margen",""), row_dict.get("Riesgo",""), row_dict.get("Beneficio",""), row_dict.get("R/B",""),
                             "Eliminada", justification
                         ]
-                        ws_hist.append_rows(hist_row)
-                        ws_ops.delete_rows(sel_rownum + 2)
+                        ws_hist.append_row(hist_row)
+                        ws_ops.delete_rows(sel_rownum)
                         st.success("Operación pendiente eliminada y registrada en Historial.")
                         st.rerun()
             except Exception as e:
