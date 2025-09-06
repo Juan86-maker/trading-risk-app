@@ -349,47 +349,35 @@ else:
                 st.session_state["_edit_row"] = row_dict
             except Exception as e:
                 st.error(f"No se pudo cargar la fila: {e}")
+with colm2:
+    if st.button("Eliminar operación pendiente"):
+        st.session_state["eliminar_pendiente"] = True
+        st.session_state["row_dict"] = row_dict
+        st.session_state["sel_rownum"] = sel_rownum
 
-    with colm2:
-        if st.button("Eliminar operación pendiente"):
-            # only allow if pending
-            try:
-                headers = ws_ops.row_values(1)
-                row_values = ws_ops.row_values(sel_rownum)
-                #row_dict = {h: (row_values[idx] if idx < len(row_values) else "") for idx,h in enumerate(headers)}
-                
-                #st.write("DEBUG Estado detectado:", row_dict)  # 👈 muestra en pantalla lo que realmente se lee
+if st.session_state.get("eliminar_pendiente", False):
+    justification = st.text_area("Justificación para eliminar (obligatorio)")
 
-                #estado = str(row_dict.get("Estado") or row_dict.get("Orden") or row_dict.get("Orden Tipo") or "").strip().lower()
-                
-                row_dict = {h: (row_values[idx] if idx < len(row_values) else "") for idx,h in enumerate(headers)}
+    if st.button("Confirmar eliminación"):
+        row_dict = st.session_state["row_dict"]
+        sel_rownum = st.session_state["sel_rownum"]
 
-                estado = str(
-                    row_dict.get("Orden Tipo") or 
-                    row_dict.get("Estado") or 
-                    row_dict.get("Orden") or ""
-                ).strip().lower()
+        uid = row_dict.get("UID", "")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        hist_row = [
+            uid, row_dict.get("Fecha",""), now, row_dict.get("Símbolo",""), row_dict.get("Tipo",""),
+            row_dict.get("Lote",""), row_dict.get("Precio",""), row_dict.get("Stop Loss",""), row_dict.get("Take Profit",""),
+            "", row_dict.get("Margen",""), row_dict.get("Riesgo",""), row_dict.get("Beneficio",""), row_dict.get("R/B",""),
+            "Eliminada", justification
+        ]
+        ws_hist.append_row(hist_row)
+        ws_ops.delete_rows(sel_rownum)
 
-                if estado != "pendiente":
-                    st.error("Solo se pueden eliminar operaciones que estén en estado 'Pendiente'.")
-                else:
-                    justification = st.text_area("Justificación para eliminar (obligatorio)")
-                    if st.button("Confirmar eliminación"):
-                        # append to historial as cancelled
-                        uid = row_dict.get("UID", "")
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        hist_row = [
-                            uid, row_dict.get("Fecha",""), now, row_dict.get("Símbolo",""), row_dict.get("Tipo",""),
-                            row_dict.get("Lote",""), row_dict.get("Precio",""), row_dict.get("Stop Loss",""), row_dict.get("Take Profit",""),
-                            "", row_dict.get("Margen",""), row_dict.get("Riesgo",""), row_dict.get("Beneficio",""), row_dict.get("R/B",""),
-                            "Eliminada", justification
-                        ]
-                        ws_hist.append_row(hist_row)
-                        ws_ops.delete_rows(sel_rownum)
-                        st.success("Operación pendiente eliminada y registrada en Historial.")
-                        st.rerun()
-            except Exception as e:
-                st.error(f"Error al intentar eliminar: {e}")
+        st.success("Operación pendiente eliminada y registrada en Historial.")
+        # limpiar estado
+        st.session_state["eliminar_pendiente"] = False
+        st.rerun()
+
 
     with colm3:
         if st.button("Cierre automático (TP/SL)"):
