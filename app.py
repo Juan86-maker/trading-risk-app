@@ -370,7 +370,7 @@ else:
                     row_dict.get("Orden") or ""
                 ).strip().lower()
 
-                if estado != "pendiente":
+                if estado != "Pendiente":
                     st.error("Solo se pueden eliminar operaciones que estén en estado 'Pendiente'.")
                 else:
                     justification = st.text_area("Justificación para eliminar (obligatorio)")
