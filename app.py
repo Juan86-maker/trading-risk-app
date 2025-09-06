@@ -185,7 +185,7 @@ if lote is not None and precio is not None and sl is not None:
         riesgo = lote * (precio - sl) / lot_size
     # positive expected for coherent data
     if riesgo > 0:
-        incoherente = True
+        #incoherente = True
 
 if lote is not None and precio is not None and tp is not None:
     if side == "Compra":
@@ -193,10 +193,33 @@ if lote is not None and precio is not None and tp is not None:
     else:
         beneficio = lote * (precio - tp) / lot_size
     if beneficio < 0:
-        incoherente = True
+        #incoherente = True
 
-if (riesgo is not None) and (beneficio is not None) and riesgo > 0:
-    rb = safe_div(beneficio, riesgo)
+#if (riesgo is not None) and (beneficio is not None) and riesgo > 0:
+    #rb = safe_div(beneficio, riesgo)
+
+# Marcador de incoherencia (mantén la lógica que prefieras).
+# Ejemplo simple: incoherente si ambos valores existen y uno no cumple la regla esperada.
+# (Puedes ajustar la condición a tu preferencia.)
+if (riesgo is not None and beneficio is not None):
+    # Si quieres marcar incoherencia cuando riesgo no es del signo esperado:
+    #   para Compra: riesgo debería ser < 0 y beneficio > 0
+    #   para Venta: riesgo debería ser > 0  y beneficio > 0
+    if side == "Compra":
+        if not (riesgo < 0 and beneficio > 0):
+            incoherente = True
+    else:
+        if not (riesgo > 0 and beneficio > 0):
+            incoherente = True
+
+# --- R/B: usar valores absolutos y calcular siempre que ambos existan y riesgo distinto de 0 ---
+if (riesgo is not None) and (beneficio is not None):
+    denom = abs(riesgo)
+    numer = abs(beneficio)
+    if denom != 0:
+        rb = numer / denom
+    else:
+        rb = None
 
 # Display metrics (allow partial)
 m1, m2, m3, m4 = st.columns(4)
