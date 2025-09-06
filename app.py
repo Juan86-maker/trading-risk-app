@@ -208,9 +208,9 @@ if (riesgo is not None and beneficio is not None):
     if side == "Compra":
         if not (riesgo < 0 and beneficio > 0):
             incoherente = True
-    else:
-        if not (riesgo > 0 and beneficio > 0):
-            incoherente = True
+    #else:
+        #if not (riesgo > 0 and beneficio > 0):
+            #incoherente = True
 
 # --- R/B: usar valores absolutos y calcular siempre que ambos existan y riesgo distinto de 0 ---
 if (riesgo is not None) and (beneficio is not None):
