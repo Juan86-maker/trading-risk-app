@@ -205,12 +205,8 @@ if (riesgo is not None and beneficio is not None):
     # Si quieres marcar incoherencia cuando riesgo no es del signo esperado:
     #   para Compra: riesgo debería ser < 0 y beneficio > 0
     #   para Venta: riesgo debería ser > 0  y beneficio > 0
-    if side == "Compra":
-        if not (riesgo < 0 and beneficio > 0):
+    if not (riesgo < 0 and beneficio > 0):
             incoherente = True
-    #else:
-        #if not (riesgo > 0 and beneficio > 0):
-            #incoherente = True
 
 # --- R/B: usar valores absolutos y calcular siempre que ambos existan y riesgo distinto de 0 ---
 if (riesgo is not None) and (beneficio is not None):
