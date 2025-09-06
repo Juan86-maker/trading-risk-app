@@ -262,7 +262,8 @@ if st.session_state["show_register_panel"]:
                     "Riesgo": round(riesgo or 0.0, 2) if riesgo is not None else "",
                     "Beneficio": round(beneficio or 0.0, 2) if beneficio is not None else "",
                     "R/B": f"{rb:.2f}:1" if rb is not None else "",
-                    "Estado": orden_tipo,
+                    #"Estado": orden_tipo,
+                    "Orden Tipo": orden_tipo,
                     "Comentario": comentario or "",
                 }
 
