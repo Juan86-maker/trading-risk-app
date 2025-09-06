@@ -183,20 +183,12 @@ if lote is not None and precio is not None and sl is not None:
         riesgo = lote * (sl - precio) / lot_size
     else:
         riesgo = lote * (precio - sl) / lot_size
-    # positive expected for coherent data
-    #if riesgo > 0:
-        #incoherente = True
 
 if lote is not None and precio is not None and tp is not None:
     if side == "Compra":
         beneficio = lote * (tp - precio) / lot_size
     else:
         beneficio = lote * (precio - tp) / lot_size
-    #if beneficio < 0:
-        #incoherente = True
-
-#if (riesgo is not None) and (beneficio is not None) and riesgo > 0:
-    #rb = safe_div(beneficio, riesgo)
 
 # Marcador de incoherencia (mantén la lógica que prefieras).
 # Ejemplo simple: incoherente si ambos valores existen y uno no cumple la regla esperada.
@@ -204,7 +196,6 @@ if lote is not None and precio is not None and tp is not None:
 if (riesgo is not None and beneficio is not None):
     # Si quieres marcar incoherencia cuando riesgo no es del signo esperado:
     #   para Compra: riesgo debería ser < 0 y beneficio > 0
-    #   para Venta: riesgo debería ser > 0  y beneficio > 0
     if not (riesgo < 0 and beneficio > 0):
             incoherente = True
 
