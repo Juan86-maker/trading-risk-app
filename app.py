@@ -305,6 +305,14 @@ st.header("Lista de Sucesos (Operaciones)")
 try:
     records = ws_ops.get_all_records()
     df_ops = pd.DataFrame(records)
+
+    # 🔹 Formatear columnas numéricas con hasta 2 decimales
+    for col in ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]:
+        if col in df_ops.columns:
+            df_ops[col] = pd.to_numeric(df_ops[col], errors="coerce").map(
+                lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notnull(x) else ""
+            )
+
 except Exception as e:
     st.error(f"No se puede leer Operaciones: {e}")
     df_ops = pd.DataFrame()
