@@ -472,40 +472,87 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
     edit_rownum = st.session_state["_edit_rownum"]
     edit = st.session_state["_edit_row"]
 
-    # show editable fields for SL, TP, Comentario and activation if pending
-    edit_sl = st.text_input("Stop Loss", value=str(edit.get("Stop Loss","")))
-    edit_tp = st.text_input("Take Profit", value=str(edit.get("Take Profit","")))
-    edit_comment = st.text_area("Comentario", value=str(edit.get("Comentario","")))
+    # datos base
+    precio = parse_decimal(str(edit.get("Precio", "")).replace(",", ".") or "0")
+    lote = parse_decimal(str(edit.get("Lote", "")).replace(",", ".") or "0")
+    side = str(edit.get("Tipo", "")).strip().lower()
+
+    # show editable fields
+    edit_sl = st.text_input("Stop Loss", value=str(edit.get("Stop Loss", "")))
+    edit_tp = st.text_input("Take Profit", value=str(edit.get("Take Profit", "")))
+    edit_comment = st.text_area("Comentario", value=str(edit.get("Comentario", "")))
+
     estado_act = str(edit.get("Estado") or edit.get("Orden") or edit.get("Orden Tipo") or "").strip().lower()
     activar_btn = False
     if estado_act == "pendiente":
         activar_btn = st.checkbox("Activar operación (marcar como Mercado)")
 
+    # --- cálculo dinámico de riesgo, beneficio y R/B ---
+    sl_val = parse_decimal(edit_sl) if edit_sl.strip() != "" else None
+    tp_val = parse_decimal(edit_tp) if edit_tp.strip() != "" else None
+
+    riesgo = None
+    beneficio = None
+    rb = None
+
+    if sl_val is not None:
+        if side == "compra":
+            riesgo = (sl_val - precio) * lote
+        else:  # venta
+            riesgo = (precio - sl_val) * lote
+
+    if tp_val is not None:
+        if side == "compra":
+            beneficio = (tp_val - precio) * lote
+        else:  # venta
+            beneficio = (precio - tp_val) * lote
+
+    if riesgo is not None and beneficio is not None and riesgo != 0:
+        rb = abs(beneficio / abs(riesgo))
+
+    # mostrar preview dinámico
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Riesgo", f"{riesgo:.2f}" if riesgo is not None else "-")
+    with col2:
+        st.metric("Beneficio", f"{beneficio:.2f}" if beneficio is not None else "-")
+    with col3:
+        st.metric("R/B", f"{rb:.2f}:1" if rb is not None else "-")
+
+    # botón guardar
     if st.button("Guardar modificación"):
         try:
             headers = ws_ops.row_values(1)
-            # build updated dict
             updated = edit.copy()
-            updated["Stop Loss"] = parse_decimal(edit_sl) if edit_sl.strip() != "" else ""
-            updated["Take Profit"] = parse_decimal(edit_tp) if edit_tp.strip() != "" else ""
+            updated["Stop Loss"] = sl_val if sl_val is not None else ""
+            updated["Take Profit"] = tp_val if tp_val is not None else ""
             updated["Comentario"] = edit_comment or ""
             if activar_btn:
                 updated["Estado"] = "Mercado"
 
-            # build row following headers
+            # actualizar también riesgo, beneficio y R/B
+            if riesgo is not None:
+                updated["Riesgo"] = round(riesgo, 2)
+            if beneficio is not None:
+                updated["Beneficio"] = round(beneficio, 2)
+            if rb is not None:
+                updated["R/B"] = f"{rb:.2f}:1"
+
+            # construir fila y guardar
             new_row = [updated.get(h, "") for h in headers]
-            # update via range
             last_col = len(headers)
             col_letter = colnum_to_letters(last_col)
             rng = f"A{edit_rownum}:{col_letter}{edit_rownum}"
             ws_ops.update(rng, [new_row])
-            st.success("Modificación guardada en Operaciones.")
-            # clear edit state and refresh
+
+            st.success("✅ Modificación guardada en Operaciones.")
             del st.session_state["_edit_rownum"]
             del st.session_state["_edit_row"]
             st.rerun()
+
         except Exception as e:
             st.error(f"Error al guardar modificación: {e}")
+
 
 # ---------------------------
 # Manual close action panel
