@@ -525,14 +525,13 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
     edit = st.session_state["_edit_row"]
 
     # datos base
-    # al cargar el edit dict 'edit' (viene de ws_ops.row_values)
-    precio_pref = parse_to_float(edit.get("Precio", ""))
-    lote_pref  = parse_to_float(edit.get("Lote", ""))
+    precio = parse_decimal(str(edit.get("Precio", "")).replace(",", ".") or "0")
+    lote = parse_decimal(str(edit.get("Lote", "")).replace(",", ".") or "0")
     side = str(edit.get("Tipo", "")).strip().lower()
 
-    # luego en los text_input usar los strings formateados:
-    edit_sl = st.text_input("Stop Loss", value=format_up_to_2(sl_pref))
-    edit_tp = st.text_input("Take Profit", value=format_up_to_2(tp_pref))
+    # show editable fields
+    edit_sl = st.text_input("Stop Loss", value=str(edit.get("Stop Loss", "")))
+    edit_tp = st.text_input("Take Profit", value=str(edit.get("Take Profit", "")))
     edit_comment = st.text_area("Comentario", value=str(edit.get("Comentario", "")))
 
     estado_act = str(edit.get("Estado") or edit.get("Orden") or edit.get("Orden Tipo") or "").strip().lower()
