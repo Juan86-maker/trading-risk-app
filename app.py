@@ -310,7 +310,7 @@ try:
     for col in ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]:
         if col in df_ops.columns:
             df_ops[col] = pd.to_numeric(df_ops[col], errors="coerce").map(
-                lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notnull(x) else ""
+                lambda x: f"{x:.2f}".rstrip("0").rstrip(",") if pd.notnull(x) else ""
             )
 
 except Exception as e:
