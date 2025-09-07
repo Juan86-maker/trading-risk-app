@@ -305,61 +305,17 @@ st.header("Lista de Sucesos (Operaciones)")
 try:
     records = ws_ops.get_all_records()
     df_ops = pd.DataFrame(records)
+
+    # 🔹 Formatear columnas numéricas con hasta 2 decimales
+    for col in ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]:
+        if col in df_ops.columns:
+            df_ops[col] = pd.to_numeric(df_ops[col], errors="coerce").map(
+                lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notnull(x) else ""
+            )
+
 except Exception as e:
     st.error(f"No se puede leer Operaciones: {e}")
     df_ops = pd.DataFrame()
-
-# --- Si viene con datos, normalizar columnas numéricas y preparar strings para mostrar ---
-def parse_to_float(v):
-    """Convierte valores variados a float o None.
-       Acepta int/float, '110,09', '1.234,56', '1234.56', '', None, etc."""
-    if v is None:
-        return None
-    # si ya es numérico
-    if isinstance(v, (int, float)):
-        try:
-            return float(v)
-        except:
-            return None
-    s = str(v).strip()
-    if s == "":
-        return None
-    # eliminar separadores de miles comunes y espacios
-    s = s.replace(" ", "").replace("'", "")
-    # heurística:
-    # si contiene '.' y ',', asumimos formato europeo '1.234,56' -> eliminar '.' y cambiar ','->'.'
-    if "." in s and "," in s:
-        s = s.replace(".", "").replace(",", ".")
-    else:
-        # si solo contiene ',', es separador decimal -> reemplazar por '.'
-        s = s.replace(",", ".")
-    try:
-        return float(s)
-    except:
-        return None
-
-def format_up_to_2(x):
-    """Devuelve string con hasta 2 decimales (no 2 fijos)."""
-    if x is None or (isinstance(x, float) and (math.isnan(x))):
-        return ""
-    try:
-        # usar formatting fijo y luego quitar ceros/trailing dot
-        s = f"{x:.2f}".rstrip("0").rstrip(".")
-        return s
-    except Exception:
-        return str(x)
-
-if not df_ops.empty:
-    # columnas numéricas que queremos normalizar para visualización
-    numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]
-
-    for col in numeric_cols:
-        if col in df_ops.columns:
-            # crear columna temporal numérica y luego string formateada
-            df_ops[col + "_num"] = df_ops[col].map(parse_to_float)
-            df_ops[col] = df_ops[col + "_num"].map(lambda v: format_up_to_2(v) if v is not None else "")
-
-    # ahora df_ops tiene las columnas con strings formateadas para mostrar (y _num si alguna vez la necesitas)
 
 if df_ops.empty:
     st.info("No hay operaciones registradas.")
