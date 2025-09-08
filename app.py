@@ -532,13 +532,43 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
         try:
             headers = ws_ops.row_values(1)
             updated = edit.copy()
+            # nuevas SL/TP/comentario
             updated["Stop Loss"] = sl_val if sl_val is not None else ""
             updated["Take Profit"] = tp_val if tp_val is not None else ""
             updated["Comentario"] = edit_comment or ""
             if activar_btn:
+                # mantén ambas claves por compatibilidad de cabeceras
                 updated["Estado"] = "Mercado"
+                updated["Orden Tipo"] = "Mercado"
 
-            # actualizar también riesgo, beneficio y R/B
+            # --- Asegurar que Lote y Precio sean numéricos (usar las variables parseadas)
+            # 'lote' y 'precio' fueron obtenidos al inicio del panel con parse_decimal(...)
+            if lote is not None:
+                updated["Lote"] = float(lote)
+            else:
+                # fallback: intentar parsear desde el campo original
+                updated["Lote"] = parse_decimal(str(updated.get("Lote", ""))) or ""
+
+            if precio is not None:
+                updated["Precio"] = float(precio)
+            else:
+                updated["Precio"] = parse_decimal(str(updated.get("Precio", ""))) or ""
+
+            # --- Recalcular Margen usando Config (mejor que confiar en cadena guardada)
+            symbol = edit.get("Símbolo") or edit.get("Symbol") or None
+            lot_size = float(LOT_SIZES.get(symbol, 1) or 1)
+            margin_pct = float(MARGIN_PCTS.get(symbol, 0.0) or 0.0)
+
+            try:
+                if updated.get("Lote") != "" and updated.get("Precio") != "":
+                    margen_new = margin_pct * float(updated["Lote"]) * float(updated["Precio"]) * lot_size
+                    updated["Margen"] = round(margen_new, 2)
+                else:
+                    updated["Margen"] = ""
+            except Exception:
+                updated["Margen"] = ""
+
+            # --- Actualizar Riesgo/Beneficio/RB (ya calculados en tiempo real en variables riesgo/beneficio/rb)
             if riesgo is not None:
                 updated["Riesgo"] = round(riesgo, 2)
             if beneficio is not None:
@@ -546,38 +576,38 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
             if rb is not None:
                 updated["R/B"] = f"{rb:.2f}:1"
 
-            # construir fila y guardar
-            # forzar numéricos
-            if "Lote" in updated:
-                try:
-                    updated["Lote"] = float(updated["Lote"])
-                except:
-                    pass
-            if "Precio" in updated:
-                try:
-                    updated["Precio"] = float(updated["Precio"])
-                except:
-                    pass
-            if "Margen" in updated:
-                try:
-                    updated["Margen"] = float(updated["Margen"])
-                except:
-                    pass
+            # --- Forzar tipos numéricos para las columnas que queremos que sean números en Sheets
+            numeric_fields = ["Lote", "Precio", "Margen", "Riesgo", "Beneficio"]
+            for nf in numeric_fields:
+                if nf in updated and updated.get(nf) != "":
+                    try:
+                        updated[nf] = float(updated[nf])
+                    except Exception:
+                        # intentar con parse_decimal (acepta coma)
+                        parsed = parse_decimal(str(updated.get(nf)))
+                        if parsed is not None:
+                            updated[nf] = float(parsed)
+                        else:
+                            # dejar como cadena si no se puede parsear
+                            pass
 
+            # construir fila y guardar (orden según headers actuales)
             new_row = [updated.get(h, "") for h in headers]
+
+            # update via range
             last_col = len(headers)
             col_letter = colnum_to_letters(last_col)
             rng = f"A{edit_rownum}:{col_letter}{edit_rownum}"
             ws_ops.update(rng, [new_row])
 
             st.success("✅ Modificación guardada en Operaciones.")
+            # limpiar estado y refrescar
             del st.session_state["_edit_rownum"]
             del st.session_state["_edit_row"]
             st.rerun()
 
         except Exception as e:
             st.error(f"Error al guardar modificación: {e}")
-
 
 # ---------------------------
 # Manual close action panel
