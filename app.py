@@ -375,7 +375,7 @@ if not df_ops.empty:
                 )
 
                 # Si quieres usar coma como separador decimal, descomenta:
-                # df_display[col] = df_display[col].str.replace(".", ",")
+                df_display[col] = df_display[col].str.replace(".", ",")
             except:
                 pass
 else:
