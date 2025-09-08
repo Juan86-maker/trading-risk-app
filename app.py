@@ -357,20 +357,30 @@ numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo"
 
 # Solo procesar si df_ops no está vacío
 if not df_ops.empty:
-    # crear columnas numéricas parseadas (sufijo _num)
-    for col in numeric_cols:
-        if col in df_ops.columns:
-            df_ops[col + "_num"] = df_ops[col].map(to_float_val)
-
-    # crear df_display: copia pero con columnas formateadas para mostrar (strings)
     df_display = df_ops.copy()
     for col in numeric_cols:
         if col in df_display.columns:
-            df_display[col] = df_display[col + "_num"].map(lambda v: fmt_up_to_2(v) if v is not None else "")
+            try:
+                # Convertir a float (acepta punto o coma como separador)
+                df_display[col] = (
+                    df_display[col]
+                    .astype(str)
+                    .str.replace(",", ".", regex=False)
+                    .astype(float)
+                )
 
-    # mantener otras columnas tal cual (símbolo, tipo, orden tipo, comentario...)
+                # Formatear hasta 2 decimales (sin ceros extra)
+                df_display[col] = df_display[col].map(
+                    lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notna(x) else ""
+                )
+
+                # Si quieres usar coma como separador decimal, descomenta:
+                # df_display[col] = df_display[col].str.replace(".", ",")
+            except:
+                pass
 else:
     df_display = df_ops.copy()  # vacío
+
 
 # ---------------------------
 # Visualización y selección (igual que antes, pero usando df_display para mostrar)
