@@ -352,29 +352,49 @@ def fmt_up_to_2(x):
     s = f"{x:.2f}".rstrip("0").rstrip(".")
     return s
 
-    # Columnas que deben ser numéricas
-    numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]
-    
+# columnas numéricas a normalizar/mostrar
+numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]
+
+# Solo procesar si df_ops no está vacío
+if not df_ops.empty:
+    # crear columnas numéricas parseadas (sufijo _num)
     for col in numeric_cols:
         if col in df_ops.columns:
-            try:
-                # Convertir siempre a float
-                df_ops[col] = (
-                    df_ops[col]
-                    .astype(str)
-                    .str.replace(",", ".", regex=False)
-                    .astype(float)
-                )
+            df_ops[col + "_num"] = df_ops[col].map(to_float_val)
+
+    # crear df_display: copia pero con columnas formateadas para mostrar (strings)
+    df_display = df_ops.copy()
+    for col in numeric_cols:
+        if col in df_display.columns:
+            df_display[col] = df_display[col + "_num"].map(lambda v: fmt_up_to_2(v) if v is not None else "")
+
+    # mantener otras columnas tal cual (símbolo, tipo, orden tipo, comentario...)
+else:
+    df_display = df_ops.copy()  # vacío
+
+    # ---------------------------
+    # Visualización y selección (igual que antes, pero usando df_display para mostrar)
+    # ---------------------------
+    if df_display.empty:
+        st.info("No hay operaciones registradas.")
+    else:
+        # create display strings including row number (usar df_ops para índices reales)
+        options = []
+        for i, row in df_ops.iterrows():
+            rownum = i + 2
+            estado = str((row.get("Orden Tipo") or row.get("Estado") or row.get("Orden") or "")).strip()
+            display = f"{rownum} | {row.get('Símbolo','')} | {row.get('Tipo','')} | {estado}"
+            options.append(display)
     
-                # Formatear con hasta 2 decimales (sin ceros de más)
-                df_ops[col] = df_ops[col].map(
-                    lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notna(x) else ""
-                )
+        selected = st.selectbox("Selecciona una operación (fila | simb | tipo | estado)", options)
     
-                # Si quieres coma en vez de punto (puedes probar):
-                # df_ops[col] = df_ops[col].str.replace(".", ",")
-            except:
-                pass
+        # style: aplicar color sobre df_display
+        def style_rows(r):
+            estado = str(r.get("Orden Tipo") or r.get("Estado") or r.get("Orden") or "").strip().lower()
+            if estado == "pendiente":
+                return ["background-color:#fff3cd"] * len(r)
+            else:
+                return ["background-color:#d4edda"] * len(r)
 
     st.dataframe(df_display.style.apply(style_rows, axis=1), use_container_width=True)
 
