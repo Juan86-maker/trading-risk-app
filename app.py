@@ -481,8 +481,8 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
     edit = st.session_state["_edit_row"]
 
     # datos base
-    precio = parse_decimal(str(edit.get("Precio", "")).replace(",", ".") or "0")
-    lote = parse_decimal(str(edit.get("Lote", "")).replace(",", ".") or "0")
+    precio = parse_decimal(str(edit.get("Precio", "")) or "0")
+    lote = parse_decimal(str(edit.get("Lote", "")) or "0")
     side = str(edit.get("Tipo", "")).strip().lower()
 
     # show editable fields
