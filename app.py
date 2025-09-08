@@ -172,11 +172,11 @@ if lote is not None and precio is not None:
 
 # Formulas per your spec:
 # For compra:
-# Riesgo = lote*(SL - Precio)/tamaño_lote
-# Beneficio = lote*(TP - Precio)/tamaño_lote
+# Riesgo = lote*(SL - Precio)*tamaño_lote
+# Beneficio = lote*(TP - Precio)*tamaño_lote
 # For venta:
-# Riesgo = lote*(Precio - SL)/tamaño_lote
-# Beneficio = lote*(Precio - TP)/tamaño_lote
+# Riesgo = lote*(Precio - SL)*tamaño_lote
+# Beneficio = lote*(Precio - TP)*tamaño_lote
 
 if lote is not None and precio is not None and sl is not None:
     if side == "Compra":
@@ -505,15 +505,15 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
 
     if sl_val is not None:
         if side == "compra":
-            riesgo = (sl_val - precio) * lote
+            riesgo = (sl_val - precio) * lote * lot_size
         else:  # venta
-            riesgo = (precio - sl_val) * lote
+            riesgo = (precio - sl_val) * lote * lot_size
 
     if tp_val is not None:
         if side == "compra":
-            beneficio = (tp_val - precio) * lote
+            beneficio = (tp_val - precio) * lote * lot_size
         else:  # venta
-            beneficio = (precio - tp_val) * lote
+            beneficio = (precio - tp_val) * lote * lot_size
 
     if riesgo is not None and beneficio is not None and riesgo != 0:
         rb = abs(beneficio / abs(riesgo))
