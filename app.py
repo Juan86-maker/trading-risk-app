@@ -309,26 +309,49 @@ except Exception as e:
     st.error(f"No se puede leer Operaciones: {e}")
     df_ops = pd.DataFrame()
 
-# Solo formatear si hay datos
-if not df_ops.empty:
-    for col in ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]:
-        if col in df_ops.columns:
-            # Reemplazar coma por punto para poder convertir
-            df_ops[col] = df_ops[col].astype(str).str.replace(",", ".", regex=False)
-
-            # Convertir a numérico
-            df_ops[col] = pd.to_numeric(df_ops[col], errors="coerce")
-
-            # Mostrar con hasta 2 decimales (ej: 110.1 -> 110.1, 110.00 -> 110)
-            df_ops[col] = df_ops[col].map(
-                lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notna(x) else ""
-            )
-
 if df_ops.empty:
     st.info("No hay operaciones registradas.")
 else:
-    # create display strings including row number
-    # get number of header columns to compute row numbers: records correspond to rows 2..n+1
+    import math
+
+    # helpers locales (robustos frente a comas, miles, strings)
+    def to_float_val(v):
+        if v is None:
+            return None
+        if isinstance(v, (int, float)) and not (isinstance(v, float) and math.isnan(v)):
+            return float(v)
+        s = str(v).strip()
+        if s == "" or s.lower() in ["nan", "none"]:
+            return None
+        s = s.replace(" ", "").replace("'", "")
+        # si tiene punto y coma (ej. "1.234,56"), eliminar miles y adaptar decimal
+        if "." in s and "," in s:
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", ".")
+        try:
+            return float(s)
+        except:
+            return None
+
+    def fmt_up_to_2(x):
+        if x is None or (isinstance(x, float) and math.isnan(x)):
+            return ""
+        s = f"{x:.2f}".rstrip("0").rstrip(".")
+        return s
+
+    # columnas que queremos mostrar formateadas
+    numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]
+
+    # Construir DF para mostrar (no tocamos df_ops original)
+    df_display = df_ops.copy()
+
+    # Normalizar y formatear cada columna numérica como string con hasta 2 decimales
+    for col in numeric_cols:
+        if col in df_display.columns:
+            df_display[col] = df_display[col].map(lambda v: fmt_up_to_2(to_float_val(v)))
+
+    # Crear la lista de opciones (usamos df_ops original para mantener índices numéricos correctos)
     options = []
     for i, row in df_ops.iterrows():
         rownum = i + 2
@@ -337,38 +360,23 @@ else:
         options.append(display)
 
     selected = st.selectbox("Selecciona una operación (fila | simb | tipo | estado)", options)
-    # show table with color
+
+    # Estilado por fila según 'Orden Tipo' o equivalentes (aplicar sobre df_display)
     def style_rows(r):
-        estado = str(r.get("Estado") or r.get("Orden") or r.get("Orden Tipo") or "").strip().lower()
+        estado = str(r.get("Orden Tipo") or r.get("Estado") or r.get("Orden") or "").strip().lower()
         if estado == "pendiente":
             return ["background-color:#fff3cd"] * len(r)
         else:
             return ["background-color:#d4edda"] * len(r)
-            
-    # Normalizar columnas numéricas antes de mostrar
-    numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]
-    for col in numeric_cols:
-        if col in df_ops.columns:
-            # Pasar a string, reemplazar coma por punto, luego a float
-            df_ops[col] = (
-                df_ops[col]
-                .astype(str)
-                .str.replace(",", ".", regex=False)
-                .astype(float)
-            )
-    
-            # Formatear para mostrar hasta 2 decimales (sin ceros de más)
-            df_ops[col] = df_ops[col].map(
-                lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notna(x) else ""
-            )
 
-    st.dataframe(df_ops.style.apply(style_rows, axis=1), use_container_width=True)
+    # Mostrar la tabla de visualización (strings formateados)
+    st.dataframe(df_display.style.apply(style_rows, axis=1), use_container_width=True)
 
-    # buttons for modify / actions
+    # botones y selección (se mantiene la lógica anterior)
     st.markdown("### Acciones sobre la operación seleccionada")
     colm1, colm2, colm3 = st.columns(3)
-    # compute selected rownum
     sel_rownum = int(selected.split("|")[0].strip())
+
 
     with colm1:
         if st.button("Modificar operación seleccionada"):
