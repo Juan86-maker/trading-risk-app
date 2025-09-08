@@ -547,6 +547,23 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
                 updated["R/B"] = f"{rb:.2f}:1"
 
             # construir fila y guardar
+            # forzar numéricos
+            if "Lote" in updated:
+                try:
+                    updated["Lote"] = float(updated["Lote"])
+                except:
+                    pass
+            if "Precio" in updated:
+                try:
+                    updated["Precio"] = float(updated["Precio"])
+                except:
+                    pass
+            if "Margen" in updated:
+                try:
+                    updated["Margen"] = float(updated["Margen"])
+                except:
+                    pass
+
             new_row = [updated.get(h, "") for h in headers]
             last_col = len(headers)
             col_letter = colnum_to_letters(last_col)
