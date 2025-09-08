@@ -180,15 +180,15 @@ if lote is not None and precio is not None:
 
 if lote is not None and precio is not None and sl is not None:
     if side == "Compra":
-        riesgo = lote * (sl - precio) / lot_size
+        riesgo = lote * (sl - precio) * lot_size
     else:
-        riesgo = lote * (precio - sl) / lot_size
+        riesgo = lote * (precio - sl) * lot_size
 
 if lote is not None and precio is not None and tp is not None:
     if side == "Compra":
-        beneficio = lote * (tp - precio) / lot_size
+        beneficio = lote * (tp - precio) * lot_size
     else:
-        beneficio = lote * (precio - tp) / lot_size
+        beneficio = lote * (precio - tp) * lot_size
 
 # Marcador de incoherencia (mantén la lógica que prefieras).
 # Ejemplo simple: incoherente si ambos valores existen y uno no cumple la regla esperada.
