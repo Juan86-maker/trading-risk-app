@@ -297,71 +297,98 @@ if st.session_state["show_register_panel"]:
                     st.error(f"Error al guardar en Google Sheets: {e}")
 
 # ---------------------------
-# List of operations (with selection)
+# List of operations (with selection) - lectura robusta desde Google Sheets
 # ---------------------------
 st.markdown("---")
 st.header("Lista de Sucesos (Operaciones)")
 
 try:
-    records = ws_ops.get_all_records()
-    df_ops = pd.DataFrame(records)
+    raw_values = ws_ops.get_all_values()  # lee la hoja tal y como se muestra (strings)
 except Exception as e:
     st.error(f"No se puede leer Operaciones: {e}")
+    raw_values = []
+
+# if no data or only header
+if not raw_values or len(raw_values) < 2:
     df_ops = pd.DataFrame()
-
-if df_ops.empty:
-    st.info("No hay operaciones registradas.")
 else:
-    import math
+    # primera fila = cabeceras
+    headers = raw_values[0]
+    rows = raw_values[1:]
+    df_ops = pd.DataFrame(rows, columns=headers)
 
-    # helpers locales (robustos frente a comas, miles, strings)
-    def to_float_val(v):
-        if v is None:
-            return None
-        if isinstance(v, (int, float)) and not (isinstance(v, float) and math.isnan(v)):
-            return float(v)
-        s = str(v).strip()
-        if s == "" or s.lower() in ["nan", "none"]:
-            return None
-        s = s.replace(" ", "").replace("'", "")
-        # si tiene punto y coma (ej. "1.234,56"), eliminar miles y adaptar decimal
-        if "." in s and "," in s:
-            s = s.replace(".", "").replace(",", ".")
-        else:
-            s = s.replace(",", ".")
-        try:
-            return float(s)
-        except:
-            return None
+# --- helpers robustos para parseo/formatado ---
+import math
 
-    def fmt_up_to_2(x):
-        if x is None or (isinstance(x, float) and math.isnan(x)):
-            return ""
-        s = f"{x:.2f}".rstrip("0").rstrip(".")
-        return s
+def to_float_val(v):
+    """Intenta convertir una celda (texto o número) a float.
+       Acepta formatos: '1.234,56', '1234.56', '110,09', '0,01', 1234, 1234.0, etc."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)) and not (isinstance(v, float) and math.isnan(v)):
+        return float(v)
+    s = str(v).strip()
+    if s == "" or s.lower() in ["nan", "none"]:
+        return None
+    # limpiar espacios y apóstrofes usados como miles
+    s = s.replace(" ", "").replace("'", "")
+    # heurística:
+    # si contiene '.' y ',' => asumimos que '.' es separador de miles y ',' decimal -> "1.234,56"
+    if "." in s and "," in s:
+        s = s.replace(".", "").replace(",", ".")
+    else:
+        # si solo contiene ',' -> decimal europeo -> cambiar a punto
+        # si solo contiene '.' -> podría ser decimal en formato en-US (dejamos punto)
+        s = s.replace(",", ".")
+    try:
+        return float(s)
+    except:
+        return None
 
-    # columnas que queremos mostrar formateadas
-    numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]
+def fmt_up_to_2(x):
+    """Formatea float a string con hasta 2 decimales (no forzados): 110.00->'110', 110.10->'110.1'"""
+    if x is None or (isinstance(x, float) and math.isnan(x)):
+        return ""
+    s = f"{x:.2f}".rstrip("0").rstrip(".")
+    return s
 
-    # Construir DF para mostrar (no tocamos df_ops original)
+# columnas numéricas a normalizar/mostrar
+numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]
+
+# Solo procesar si df_ops no está vacío
+if not df_ops.empty:
+    # crear columnas numéricas parseadas (sufijo _num)
+    for col in numeric_cols:
+        if col in df_ops.columns:
+            df_ops[col + "_num"] = df_ops[col].map(to_float_val)
+
+    # crear df_display: copia pero con columnas formateadas para mostrar (strings)
     df_display = df_ops.copy()
-
-    # Normalizar y formatear cada columna numérica como string con hasta 2 decimales
     for col in numeric_cols:
         if col in df_display.columns:
-            df_display[col] = df_display[col].map(lambda v: fmt_up_to_2(to_float_val(v)))
+            df_display[col] = df_display[col + "_num"].map(lambda v: fmt_up_to_2(v) if v is not None else "")
 
-    # Crear la lista de opciones (usamos df_ops original para mantener índices numéricos correctos)
+    # mantener otras columnas tal cual (símbolo, tipo, orden tipo, comentario...)
+else:
+    df_display = df_ops.copy()  # vacío
+
+# ---------------------------
+# Visualización y selección (igual que antes, pero usando df_display para mostrar)
+# ---------------------------
+if df_display.empty:
+    st.info("No hay operaciones registradas.")
+else:
+    # create display strings including row number (usar df_ops para índices reales)
     options = []
     for i, row in df_ops.iterrows():
         rownum = i + 2
-        estado = str(row.get("Estado") or row.get("Orden") or row.get("Orden Tipo") or "").strip()
+        estado = str((row.get("Orden Tipo") or row.get("Estado") or row.get("Orden") or "")).strip()
         display = f"{rownum} | {row.get('Símbolo','')} | {row.get('Tipo','')} | {estado}"
         options.append(display)
 
     selected = st.selectbox("Selecciona una operación (fila | simb | tipo | estado)", options)
 
-    # Estilado por fila según 'Orden Tipo' o equivalentes (aplicar sobre df_display)
+    # style: aplicar color sobre df_display
     def style_rows(r):
         estado = str(r.get("Orden Tipo") or r.get("Estado") or r.get("Orden") or "").strip().lower()
         if estado == "pendiente":
@@ -369,19 +396,12 @@ else:
         else:
             return ["background-color:#d4edda"] * len(r)
 
-    st.write("DEBUG - tipos y primeros registros (raw df_ops):")
-    st.write(df_ops.head().to_dict(orient="records"))
-    st.write("DEBUG - df_display (lo que se va a mostrar):")
-    st.write(df_display.head().to_dict(orient="records"))
-    
-    # Mostrar la tabla de visualización (strings formateados)
     st.dataframe(df_display.style.apply(style_rows, axis=1), use_container_width=True)
 
-    # botones y selección (se mantiene la lógica anterior)
+    # buttons for modify / actions (igual que antes)
     st.markdown("### Acciones sobre la operación seleccionada")
     colm1, colm2, colm3 = st.columns(3)
     sel_rownum = int(selected.split("|")[0].strip())
-
 
     with colm1:
         if st.button("Modificar operación seleccionada"):
