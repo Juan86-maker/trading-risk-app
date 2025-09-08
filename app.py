@@ -352,49 +352,29 @@ def fmt_up_to_2(x):
     s = f"{x:.2f}".rstrip("0").rstrip(".")
     return s
 
-# columnas numéricas a normalizar/mostrar
-numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]
-
-# Solo procesar si df_ops no está vacío
-if not df_ops.empty:
-    # crear columnas numéricas parseadas (sufijo _num)
+    # Columnas que deben ser numéricas
+    numeric_cols = ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]
+    
     for col in numeric_cols:
         if col in df_ops.columns:
-            df_ops[col + "_num"] = df_ops[col].map(to_float_val)
-
-    # crear df_display: copia pero con columnas formateadas para mostrar (strings)
-    df_display = df_ops.copy()
-    for col in numeric_cols:
-        if col in df_display.columns:
-            df_display[col] = df_display[col + "_num"].map(lambda v: fmt_up_to_2(v) if v is not None else "")
-
-    # mantener otras columnas tal cual (símbolo, tipo, orden tipo, comentario...)
-else:
-    df_display = df_ops.copy()  # vacío
-
-# ---------------------------
-# Visualización y selección (igual que antes, pero usando df_display para mostrar)
-# ---------------------------
-if df_display.empty:
-    st.info("No hay operaciones registradas.")
-else:
-    # create display strings including row number (usar df_ops para índices reales)
-    options = []
-    for i, row in df_ops.iterrows():
-        rownum = i + 2
-        estado = str((row.get("Orden Tipo") or row.get("Estado") or row.get("Orden") or "")).strip()
-        display = f"{rownum} | {row.get('Símbolo','')} | {row.get('Tipo','')} | {estado}"
-        options.append(display)
-
-    selected = st.selectbox("Selecciona una operación (fila | simb | tipo | estado)", options)
-
-    # style: aplicar color sobre df_display
-    def style_rows(r):
-        estado = str(r.get("Orden Tipo") or r.get("Estado") or r.get("Orden") or "").strip().lower()
-        if estado == "pendiente":
-            return ["background-color:#fff3cd"] * len(r)
-        else:
-            return ["background-color:#d4edda"] * len(r)
+            try:
+                # Convertir siempre a float
+                df_ops[col] = (
+                    df_ops[col]
+                    .astype(str)
+                    .str.replace(",", ".", regex=False)
+                    .astype(float)
+                )
+    
+                # Formatear con hasta 2 decimales (sin ceros de más)
+                df_ops[col] = df_ops[col].map(
+                    lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notna(x) else ""
+                )
+    
+                # Si quieres coma en vez de punto (puedes probar):
+                # df_ops[col] = df_ops[col].str.replace(".", ",")
+            except:
+                pass
 
     st.dataframe(df_display.style.apply(style_rows, axis=1), use_container_width=True)
 
@@ -414,62 +394,62 @@ else:
                 st.session_state["_edit_row"] = row_dict
             except Exception as e:
                 st.error(f"No se pudo cargar la fila: {e}")
-with colm2:
-    if st.button("Eliminar operación pendiente"):
-        try:
-            headers = ws_ops.row_values(1)
-            row_values = ws_ops.row_values(sel_rownum)
-            row_dict = {h: (row_values[idx] if idx < len(row_values) else "") for idx, h in enumerate(headers)}
-
-            estado = str(row_dict.get("Estado") or row_dict.get("Orden") or row_dict.get("Orden Tipo") or "").strip().lower()
-            if estado != "pendiente":
-                st.error("❌ Solo se pueden eliminar operaciones en estado 'Pendiente'.")
-            else:
-                st.session_state["show_delete_panel"] = True
-                st.session_state["_delete_row"] = row_dict
-                st.session_state["_delete_rownum"] = sel_rownum
-
-        except Exception as e:
-            st.error(f"Error al intentar preparar la eliminación: {e}")
-
-
-    # Mostrar el formulario de eliminación solo si se activó
-    if st.session_state.get("show_delete_panel", False):
-        st.subheader("Eliminar operación pendiente")
+    with colm2:
+        if st.button("Eliminar operación pendiente"):
+            try:
+                headers = ws_ops.row_values(1)
+                row_values = ws_ops.row_values(sel_rownum)
+                row_dict = {h: (row_values[idx] if idx < len(row_values) else "") for idx, h in enumerate(headers)}
     
-        with st.form("delete_form"):
-            justification = st.text_area("Justificación para eliminar (obligatorio)")
-            submitted = st.form_submit_button("Confirmar eliminación")
-    
-            if submitted:
-                if not justification.strip():
-                    st.error("⚠️ La justificación es obligatoria.")
+                estado = str(row_dict.get("Estado") or row_dict.get("Orden") or row_dict.get("Orden Tipo") or "").strip().lower()
+                if estado != "pendiente":
+                    st.error("❌ Solo se pueden eliminar operaciones en estado 'Pendiente'.")
                 else:
-                    try:
-                        row_dict = st.session_state["_delete_row"]
-                        sel_rownum = st.session_state["_delete_rownum"]
+                    st.session_state["show_delete_panel"] = True
+                    st.session_state["_delete_row"] = row_dict
+                    st.session_state["_delete_rownum"] = sel_rownum
     
-                        uid = row_dict.get("UID", "")
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            except Exception as e:
+                st.error(f"Error al intentar preparar la eliminación: {e}")
     
-                        hist_row = [
-                            uid, row_dict.get("Fecha",""), now, row_dict.get("Símbolo",""), row_dict.get("Tipo",""),
-                            row_dict.get("Lote",""), row_dict.get("Precio",""), row_dict.get("Stop Loss",""), row_dict.get("Take Profit",""),
-                            "", row_dict.get("Margen",""), row_dict.get("Riesgo",""), row_dict.get("Beneficio",""), row_dict.get("R/B",""),
-                            "Eliminada", justification
-                        ]
     
-                        ws_hist.append_row(hist_row)
-                        ws_ops.delete_rows(sel_rownum)
-    
-                        st.success("✅ Operación pendiente eliminada y registrada en Historial.")
-    
-                        # limpiar estado y refrescar
-                        st.session_state["show_delete_panel"] = False
-                        st.rerun()
-    
-                    except Exception as e:
-                        st.error(f"Error al intentar eliminar: {e}")
+        # Mostrar el formulario de eliminación solo si se activó
+        if st.session_state.get("show_delete_panel", False):
+            st.subheader("Eliminar operación pendiente")
+        
+            with st.form("delete_form"):
+                justification = st.text_area("Justificación para eliminar (obligatorio)")
+                submitted = st.form_submit_button("Confirmar eliminación")
+        
+                if submitted:
+                    if not justification.strip():
+                        st.error("⚠️ La justificación es obligatoria.")
+                    else:
+                        try:
+                            row_dict = st.session_state["_delete_row"]
+                            sel_rownum = st.session_state["_delete_rownum"]
+        
+                            uid = row_dict.get("UID", "")
+                            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+                            hist_row = [
+                                uid, row_dict.get("Fecha",""), now, row_dict.get("Símbolo",""), row_dict.get("Tipo",""),
+                                row_dict.get("Lote",""), row_dict.get("Precio",""), row_dict.get("Stop Loss",""), row_dict.get("Take Profit",""),
+                                "", row_dict.get("Margen",""), row_dict.get("Riesgo",""), row_dict.get("Beneficio",""), row_dict.get("R/B",""),
+                                "Eliminada", justification
+                            ]
+        
+                            ws_hist.append_row(hist_row)
+                            ws_ops.delete_rows(sel_rownum)
+        
+                            st.success("✅ Operación pendiente eliminada y registrada en Historial.")
+        
+                            # limpiar estado y refrescar
+                            st.session_state["show_delete_panel"] = False
+                            st.rerun()
+        
+                        except Exception as e:
+                            st.error(f"Error al intentar eliminar: {e}")
 
     with colm3:
         if st.button("Cierre automático (TP/SL)"):
