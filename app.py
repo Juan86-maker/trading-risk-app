@@ -369,6 +369,11 @@ else:
         else:
             return ["background-color:#d4edda"] * len(r)
 
+    st.write("DEBUG - tipos y primeros registros (raw df_ops):")
+    st.write(df_ops.head().to_dict(orient="records"))
+    st.write("DEBUG - df_display (lo que se va a mostrar):")
+    st.write(df_display.head().to_dict(orient="records"))
+    
     # Mostrar la tabla de visualización (strings formateados)
     st.dataframe(df_display.style.apply(style_rows, axis=1), use_container_width=True)
 
