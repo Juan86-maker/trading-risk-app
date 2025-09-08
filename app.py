@@ -309,6 +309,21 @@ except Exception as e:
     st.error(f"No se puede leer Operaciones: {e}")
     df_ops = pd.DataFrame()
 
+# Solo formatear si hay datos
+if not df_ops.empty:
+    for col in ["Lote", "Precio", "Stop Loss", "Take Profit", "Margen", "Riesgo", "Beneficio"]:
+        if col in df_ops.columns:
+            # Reemplazar coma por punto para poder convertir
+            df_ops[col] = df_ops[col].astype(str).str.replace(",", ".", regex=False)
+
+            # Convertir a numérico
+            df_ops[col] = pd.to_numeric(df_ops[col], errors="coerce")
+
+            # Mostrar con hasta 2 decimales (ej: 110.1 -> 110.1, 110.00 -> 110)
+            df_ops[col] = df_ops[col].map(
+                lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notna(x) else ""
+            )
+
 if df_ops.empty:
     st.info("No hay operaciones registradas.")
 else:
