@@ -369,9 +369,9 @@ if not df_ops.empty:
                     .astype(float)
                 )
 
-                # Formatear hasta 2 decimales (sin ceros extra)
+                # Formatear hasta 5 decimales (sin ceros extra)
                 df_display[col] = df_display[col].map(
-                    lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if pd.notna(x) else ""
+                    lambda x: f"{x:.5f}".rstrip("0").rstrip(".") if pd.notna(x) else ""
                 )
 
                 # Si quieres usar coma como separador decimal, descomenta:
