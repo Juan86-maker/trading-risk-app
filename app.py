@@ -559,8 +559,17 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
 
     estado_act = str(edit.get("Estado") or edit.get("Orden") or edit.get("Orden Tipo") or "").strip().lower()
     activar_btn = False
+    #if estado_act == "pendiente":
+        #activar_btn = st.checkbox("Activar operación (marcar como Mercado)")
+    activar_tipo = None
     if estado_act == "pendiente":
-        activar_btn = st.checkbox("Activar operación (marcar como Mercado)")
+        activar_btn = st.checkbox("Activar operación")
+        if activar_btn:
+            activar_tipo = st.radio(
+                "Selecciona tipo de activación",
+                ["Stopeada", "Limitada"],
+                horizontal=True
+            )
 
     # --- cálculo dinámico de riesgo, beneficio y R/B ---
     sl_val = parse_decimal(edit_sl) if edit_sl.strip() != "" else None
@@ -603,10 +612,13 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
             updated["Stop Loss"] = sl_val if sl_val is not None else ""
             updated["Take Profit"] = tp_val if tp_val is not None else ""
             updated["Comentario"] = edit_comment or ""
-            if activar_btn:
+            #if activar_btn:
                 # mantén ambas claves por compatibilidad de cabeceras
-                updated["Estado"] = "Mercado"
-                updated["Orden Tipo"] = "Mercado"
+                #updated["Estado"] = "Mercado"
+                #updated["Orden Tipo"] = "Mercado"
+            if activar_btn and activar_tipo:
+                updated["Estado"] = activar_tipo
+                updated["Orden Tipo"] = activar_tipo
 
             # --- Asegurar que Lote y Precio sean numéricos (usar las variables parseadas)
             # 'lote' y 'precio' fueron obtenidos al inicio del panel con parse_decimal(...)
