@@ -727,49 +727,86 @@ with col1:
             row_values = ws_ops.row_values(sel_rownum)
             row_dict = {h: (row_values[idx] if idx < len(row_values) else "") for idx,h in enumerate(headers)}
             estado = str(row_dict.get("Estado") or row_dict.get("Orden") or row_dict.get("Orden Tipo") or "").strip().lower()
+
             if estado == "pendiente":
-                st.error("No se puede cerrar manualmente una operación pendiente; actívala primero.")
+                st.error("❌ No se puede cerrar manualmente una operación pendiente; actívala primero.")
             else:
-                close_price_input = st.text_input("Introduce precio de cierre (coma/punto)")
-                justif_close = st.text_area("Justificación (opcional)")
-                if st.button("Confirmar cierre manual"):
+                st.session_state["show_manualclose_panel"] = True
+                st.session_state["_manualclose_row"] = row_dict
+                st.session_state["_manualclose_rownum"] = sel_rownum
+
+        except Exception as e:
+            st.error(f"Error preparando cierre manual: {e}")
+
+    # Mostrar el panel si está activado
+    if st.session_state.get("show_manualclose_panel", False):
+        st.subheader("Registrar cierre manual")
+
+        row_dict = st.session_state["_manualclose_row"]
+        sel_rownum = st.session_state["_manualclose_rownum"]
+
+        with st.form("manualclose_form"):
+            close_price_input = st.text_input("Introduce precio de cierre (coma/punto)")
+            justif_close = st.text_area("Justificación (opcional)")
+            submitted = st.form_submit_button("Confirmar cierre manual")
+
+            if submitted:
+                try:
                     close_price = parse_decimal(close_price_input)
                     if close_price is None:
-                        st.error("Precio de cierre inválido.")
+                        st.error("⚠️ Precio de cierre inválido.")
                     else:
-                        # compute closure metrics using close_price (similar to auto)
+                        # datos base
                         symbol_r = row_dict.get("Símbolo") or row_dict.get("Symbol")
                         tipo_r = row_dict.get("Tipo") or row_dict.get("Type")
                         lote_r = parse_decimal(row_dict.get("Lote") or "")
                         precio_ent = parse_decimal(row_dict.get("Precio") or "")
                         sl_r = parse_decimal(row_dict.get("Stop Loss") or row_dict.get("SL") or "")
                         tp_r = parse_decimal(row_dict.get("Take Profit") or row_dict.get("TP") or "")
+
                         lot_size_r = float(LOT_SIZES.get(symbol_r,1) or 1)
                         margin_pct_r = float(MARGIN_PCTS.get(symbol_r,0.0) or 0.0)
                         margen_r = margin_pct_r * lote_r * precio_ent * lot_size_r if (lote_r and precio_ent) else None
 
+                        # riesgo / beneficio
                         if tipo_r == "Compra":
-                            riesgo_r = lote_r * (sl_r - precio_ent) / lot_size_r if (lote_r and precio_ent and sl_r is not None) else None
-                            beneficio_r = lote_r * (tp_r - precio_ent) / lot_size_r if (lote_r and precio_ent and tp_r is not None) else None
+                            riesgo_r = lote_r * (sl_r - precio_ent) / lot_size_r if sl_r is not None else None
+                            beneficio_r = lote_r * (tp_r - precio_ent) / lot_size_r if tp_r is not None else None
                         else:
-                            riesgo_r = lote_r * (precio_ent - sl_r) / lot_size_r if (lote_r and precio_ent and sl_r is not None) else None
-                            beneficio_r = lote_r * (precio_ent - tp_r) / lot_size_r if (lote_r and precio_ent and tp_r is not None) else None
+                            riesgo_r = lote_r * (precio_ent - sl_r) / lot_size_r if sl_r is not None else None
+                            beneficio_r = lote_r * (precio_ent - tp_r) / lot_size_r if tp_r is not None else None
 
-                        rb_r = safe_div(beneficio_r, riesgo_r) if (riesgo_r and beneficio_r) else None
+                        rb_r = safe_div(abs(beneficio_r), abs(riesgo_r)) if (riesgo_r and beneficio_r) else None
+
+                        # determinar estado de cierre
+                        if tipo_r == "Compra":
+                            estado_cierre = "Ganada" if close_price > precio_ent else "Perdida"
+                        else:
+                            estado_cierre = "Ganada" if close_price < precio_ent else "Perdida"
 
                         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         uid = row_dict.get("UID","")
-                        hist_row = [uid, row_dict.get("Fecha",""), now, symbol_r, tipo_r, lote_r, precio_ent,
-                                    sl_r, tp_r, close_price, round(margen_r or 0.0,2),
-                                    round(riesgo_r or 0.0,2) if riesgo_r is not None else "",
-                                    round(beneficio_r or 0.0,2) if beneficio_r is not None else "", f"{rb_r:.2f}:1" if rb_r else "",
-                                    "Cierre manual", justif_close or ""]
+
+                        hist_row = [
+                            uid, row_dict.get("Fecha",""), now, symbol_r, tipo_r, lote_r, precio_ent,
+                            sl_r, tp_r, close_price,
+                            round(margen_r or 0.0,2),
+                            round(riesgo_r or 0.0,2) if riesgo_r is not None else "",
+                            round(beneficio_r or 0.0,2) if beneficio_r is not None else "",
+                            f"{rb_r:.2f}:1" if rb_r else "",
+                            estado_cierre, justif_close or ""
+                        ]
+
                         ws_hist.append_row(hist_row)
-                        ws_ops.delete_row(sel_rownum)
-                        st.success("Cierre manual registrado y operación eliminada de Operaciones.")
+                        ws_ops.delete_rows(sel_rownum)   # <- corregido
+
+                        st.success(f"✅ Cierre manual registrado ({estado_cierre}) y operación eliminada de Operaciones.")
+                        st.session_state["show_manualclose_panel"] = False
                         st.rerun()
-        except Exception as e:
-            st.error(f"Error cierre manual: {e}")
+
+                except Exception as e:
+                    st.error(f"Error al registrar cierre manual: {e}")
+
 
 with col2:
     if st.button("Exportar Operaciones a CSV"):
