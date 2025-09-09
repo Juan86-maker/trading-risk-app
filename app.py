@@ -402,9 +402,9 @@ else:
     def style_rows(r):
         estado = str(r.get("Orden Tipo") or r.get("Estado") or r.get("Orden") or "").strip().lower()
         if estado == "pendiente":
-            return ["background-color:#fff3cd"] * len(r)
+            return ["background-color:#fff3cd; color:#000000"] * len(r)  # beige + texto negro
         else:
-            return ["background-color:#d4edda"] * len(r)
+            return ["background-color:#d4edda; color:#000000"] * len(r)  # verde + texto negro
 
     st.dataframe(df_display.style.apply(style_rows, axis=1), use_container_width=True)
 
