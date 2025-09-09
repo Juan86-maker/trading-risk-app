@@ -488,63 +488,81 @@ with colm3:
             row_values = ws_ops.row_values(sel_rownum)
             row_dict = {h: (row_values[idx] if idx < len(row_values) else "") for idx,h in enumerate(headers)}
             estado = str(row_dict.get("Estado") or row_dict.get("Orden") or row_dict.get("Orden Tipo") or "").strip().lower()
-
+            
             if estado == "pendiente":
-                st.error("No se puede efectuar cierre automático sobre operación pendiente. Actívala primero.")
+                st.error("❌ No se puede efectuar cierre automático sobre operación pendiente. Actívala primero.")
             else:
-                # abrimos un formulario persistente
-                with st.form("form_cierre_auto"):
-                    motivo = st.selectbox("¿Cerró por?", ["TP","SL"])
-                    confirmar = st.form_submit_button("Confirmar cierre automático")
-
-                    if confirmar:
-                        # determine precio cierre
-                        precio_cierre = None
-                        if motivo == "TP":
-                            precio_cierre = parse_decimal(row_dict.get("Take Profit") or row_dict.get("TP") or "")
-                        else:
-                            precio_cierre = parse_decimal(row_dict.get("Stop Loss") or row_dict.get("SL") or "")
-
-                        # compute cierre metrics using formulas: use close price as cierre
-                        lote_r = parse_decimal(row_dict.get("Lote") or "")
-                        precio_ent = parse_decimal(row_dict.get("Precio") or "")
-                        sl_r = parse_decimal(row_dict.get("Stop Loss") or row_dict.get("SL") or "")
-                        tp_r = parse_decimal(row_dict.get("Take Profit") or row_dict.get("TP") or "")
-                        symbol_r = row_dict.get("Símbolo") or row_dict.get("Symbol")
-                        tipo_r = row_dict.get("Tipo") or row_dict.get("Type")
-                        lot_size_r = float(LOT_SIZES.get(symbol_r, 1) or 1)
-                        margin_pct_r = float(MARGIN_PCTS.get(symbol_r, 0.0) or 0.0)
-                        margen_r = margin_pct_r * lote_r * precio_ent * lot_size_r if (lote_r and precio_ent) else None
-
-                        # Compute realized riesgo/beneficio
-                        if tipo_r.lower() == "compra":
-                            riesgo_r = lote_r * (sl_r - precio_ent) / lot_size_r if (lote_r and precio_ent and sl_r is not None) else None
-                            beneficio_r = lote_r * (tp_r - precio_ent) / lot_size_r if (lote_r and precio_ent and tp_r is not None) else None
-                        else:
-                            riesgo_r = lote_r * (precio_ent - sl_r) / lot_size_r if (lote_r and precio_ent and sl_r is not None) else None
-                            beneficio_r = lote_r * (precio_ent - tp_r) / lot_size_r if (lote_r and precio_ent and tp_r is not None) else None
-
-                        rb_r = safe_div(beneficio_r, riesgo_r) if (riesgo_r and beneficio_r) else None
-
-                        # append to historial
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        uid = row_dict.get("UID","")
-                        hist_row = [
-                            uid, row_dict.get("Fecha",""), now, symbol_r, tipo_r, lote_r, precio_ent,
-                            sl_r, tp_r, precio_cierre, round(margen_r or 0.0,2), 
-                            round(riesgo_r or 0.0,2) if riesgo_r is not None else "",
-                            round(beneficio_r or 0.0,2) if beneficio_r is not None else "",
-                            f"{rb_r:.2f}:1" if rb_r else "", 
-                            f"Cierre automático {motivo}", ""
-                        ]
-                        ws_hist.append_row(hist_row)
-                        ws_ops.delete_row(sel_rownum)
-                        st.success("Cierre automático registrado en Historial y eliminado de Operaciones.")
-                        st.rerun()
+                st.session_state["show_autoclose_panel"] = True
+                st.session_state["_autoclose_row"] = row_dict
+                st.session_state["_autoclose_rownum"] = sel_rownum
 
         except Exception as e:
             st.error(f"Error cierre automático: {e}")
 
+    # Mostrar panel si está activo
+    if st.session_state.get("show_autoclose_panel", False):
+        st.subheader("Registrar cierre automático")
+
+        row_dict = st.session_state["_autoclose_row"]
+        sel_rownum = st.session_state["_autoclose_rownum"]
+
+        with st.form("autoclose_form"):
+            motivo = st.selectbox("¿Cerró por?", ["TP","SL"])
+            submitted = st.form_submit_button("Confirmar cierre automático")
+
+            if submitted:
+                try:
+                    # determinar precio cierre
+                    precio_cierre = parse_decimal(
+                        row_dict.get("Take Profit") if motivo == "TP" else row_dict.get("Stop Loss")
+                    )
+
+                    # recoger datos base
+                    lote_r = parse_decimal(row_dict.get("Lote") or "")
+                    precio_ent = parse_decimal(row_dict.get("Precio") or "")
+                    sl_r = parse_decimal(row_dict.get("Stop Loss") or "")
+                    tp_r = parse_decimal(row_dict.get("Take Profit") or "")
+                    symbol_r = row_dict.get("Símbolo") or row_dict.get("Symbol")
+                    tipo_r = row_dict.get("Tipo") or row_dict.get("Type")
+
+                    lot_size_r = float(LOT_SIZES.get(symbol_r, 1) or 1)
+                    margin_pct_r = float(MARGIN_PCTS.get(symbol_r, 0.0) or 0.0)
+                    margen_r = margin_pct_r * lote_r * precio_ent * lot_size_r if (lote_r and precio_ent) else None
+
+                    # riesgo / beneficio
+                    if tipo_r == "Compra":
+                        riesgo_r = lote_r * (sl_r - precio_ent) / lot_size_r if sl_r is not None else None
+                        beneficio_r = lote_r * (tp_r - precio_ent) / lot_size_r if tp_r is not None else None
+                    else:
+                        riesgo_r = lote_r * (precio_ent - sl_r) / lot_size_r if sl_r is not None else None
+                        beneficio_r = lote_r * (precio_ent - tp_r) / lot_size_r if tp_r is not None else None
+
+                    rb_r = safe_div(beneficio_r, riesgo_r) if (riesgo_r and beneficio_r) else None
+
+                    # estado cierre
+                    estado_cierre = "Ganada" if motivo == "TP" else "Perdida"
+
+                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    uid = row_dict.get("UID","")
+
+                    hist_row = [
+                        uid, row_dict.get("Fecha",""), now, symbol_r, tipo_r, lote_r, precio_ent,
+                        sl_r, tp_r, precio_cierre,
+                        round(margen_r or 0.0,2), round(riesgo_r or 0.0,2) if riesgo_r is not None else "",
+                        round(beneficio_r or 0.0,2) if beneficio_r is not None else "",
+                        f"{rb_r:.2f}:1" if rb_r else "",
+                        estado_cierre, ""  # <--- diferencia respecto a eliminar
+                    ]
+
+                    ws_hist.append_row(hist_row)
+                    ws_ops.delete_row(sel_rownum)
+
+                    st.success(f"✅ Cierre automático ({estado_cierre}) registrado en Historial.")
+                    st.session_state["show_autoclose_panel"] = False
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Error al registrar cierre automático: {e}")
 
 # ---------------------------
 # Edit panel if loaded
