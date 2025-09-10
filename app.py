@@ -573,7 +573,18 @@ if "_edit_rownum" in st.session_state and "_edit_row" in st.session_state:
     edit = st.session_state["_edit_row"]
 
     # datos base
-    precio = parse_decimal(str(edit.get("Precio", "")) or "0")
+    #precio = parse_decimal(str(edit.get("Precio", "")) or "0")
+    
+    estado_act = str(edit.get("Estado") or edit.get("Orden") or edit.get("Orden Tipo") or "").strip().lower()
+    
+    # --- Precio editable solo si la operación está pendiente ---
+    if estado_act == "pendiente":
+        edit_precio = st.text_input("Precio de entrada", value=str(edit.get("Precio", "")))
+        precio = parse_decimal(edit_precio) if edit_precio.strip() != "" else None
+    else:
+        st.text_input("Precio de entrada", value=str(edit.get("Precio", "")), disabled=True)
+        precio = parse_decimal(str(edit.get("Precio", "")) or "0")
+
     lote = parse_decimal(str(edit.get("Lote", "")) or "0")
     side = str(edit.get("Tipo", "")).strip().lower()
 
